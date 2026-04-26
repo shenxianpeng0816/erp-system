@@ -1,0 +1,4 @@
+Starting project at /data/coda/dr4awfq4/ws/e19db327-89c4-4f28-b6bd-024f5bb30bac/erp-system/mobile
+Starting Metro Bundler
+CommandError: TypeError: Cannot read properties of undefined (reading 'body')
+Check the Ngrok status page for outages: https://status.ngrok.com/

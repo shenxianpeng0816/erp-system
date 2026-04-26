@@ -1,0 +1,17 @@
+# Maven
+backend/target/
+backend/.mvn/
+
+# Node
+mobile/node_modules/
+mobile/.expo/
+web/node_modules/
+web/.next/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Env
+.env.local
