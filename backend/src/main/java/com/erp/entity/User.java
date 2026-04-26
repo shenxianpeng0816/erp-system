@@ -22,6 +22,9 @@ public class User implements UserDetails {
     private String phone;
     private String email;
     private String role; // ADMIN / SALES / FINANCE / WAREHOUSE / INBOUND
+
+    /** 1=active, 0=disabled (soft delete) */
+    @TableLogic(value = "1", delval = "0")
     private Integer status;
 
     @TableField(fill = FieldFill.INSERT)

@@ -21,6 +21,9 @@ public class Customer {
     private Integer isPickupPoint;
     private BigDecimal creditLimit;
     private String remark;
+
+    /** 1=active, 0=disabled (soft delete) */
+    @TableLogic(value = "1", delval = "0")
     private Integer status;
     private Long createdBy;
 

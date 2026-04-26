@@ -18,9 +18,8 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-      logic-delete-field: status
-      logic-delete-value: 0
-      logic-not-delete-value: 1
+      # 注意：不在全局配置逻辑删除，避免影响没有 status 字段的实体
+      # 逻辑删除在 User / Customer / Product 实体上用 @TableLogic 单独标注
 
 server:
   port: 8080

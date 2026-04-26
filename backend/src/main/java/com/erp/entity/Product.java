@@ -19,6 +19,9 @@ public class Product {
     private BigDecimal unitPrice;
     private String imageUrl;
     private String remark;
+
+    /** 1=active, 0=disabled (soft delete) */
+    @TableLogic(value = "1", delval = "0")
     private Integer status;
 
     @TableField(fill = FieldFill.INSERT)
