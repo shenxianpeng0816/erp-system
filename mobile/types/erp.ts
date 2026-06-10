@@ -38,6 +38,7 @@ export interface Product {
   imageUrl?: string;
   remark?: string;
   status?: number;
+  stockQty?: number;
 }
 
 export interface OrderItem {

@@ -105,6 +105,10 @@ function CustomerPicker({
   );
 }
 
+function productStockQty(p: Product): number {
+  return Math.max(0, Number(p.stockQty ?? 0));
+}
+
 // ── Product Row ────────────────────────────────────────────────────────────
 function ProductRow({
   item,
@@ -121,6 +125,9 @@ function ProductRow({
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const selected = products.find(p => p.id === item.productId);
+  const selectableProducts = products.filter(
+    (p) => productStockQty(p) > 0 || p.id === item.productId
+  );
 
   return (
     <View style={styles.productRow}>
@@ -134,7 +141,9 @@ function ProductRow({
       {/* Product selector */}
       <TouchableOpacity style={styles.productPicker} onPress={() => setShowPicker(true)}>
         <Text style={selected ? styles.pickerMain : styles.pickerPlaceholder}>
-          {selected ? `${selected.name} (${selected.spec ?? selected.unit})` : 'Select product…'}
+          {selected
+            ? `${selected.name} (${selected.spec ?? selected.unit}) · stock ${productStockQty(selected)}`
+            : 'Select product…'}
         </Text>
       </TouchableOpacity>
 
@@ -147,20 +156,27 @@ function ProductRow({
             </TouchableOpacity>
           </View>
           <FlatList
-            data={products}
+            data={selectableProducts}
             keyExtractor={p => String(p.id)}
+            ListEmptyComponent={
+              <Text style={styles.resultSub}>No products with available stock.</Text>
+            }
             renderItem={({ item: p }) => (
               <TouchableOpacity
                 style={styles.resultItem}
                 onPress={() => {
                   onUpdate(index, 'productId', p.id);
                   onUpdate(index, 'unitPrice', p.unitPrice);
-                  onUpdate(index, 'total', p.unitPrice * (item.qty || 1));
+                  const qty = Math.min(item.qty || 1, productStockQty(p));
+                  onUpdate(index, 'qty', qty);
+                  onUpdate(index, 'total', p.unitPrice * qty);
                   setShowPicker(false);
                 }}
               >
                 <Text style={styles.resultName}>{p.name}</Text>
-                <Text style={styles.resultSub}>{p.productNo} · KSh {Number(p.unitPrice).toLocaleString()} / {p.unit}</Text>
+                <Text style={styles.resultSub}>
+                  {p.productNo} · KSh {Number(p.unitPrice).toLocaleString()} / {p.unit} · stock {productStockQty(p)}
+                </Text>
               </TouchableOpacity>
             )}
           />
@@ -176,8 +192,10 @@ function ProductRow({
             value={String(item.qty || '')}
             onChangeText={v => {
               const qty = parseInt(v) || 0;
-              onUpdate(index, 'qty', qty);
-              onUpdate(index, 'total', qty * (item.unitPrice || 0));
+              const maxQty = selected ? productStockQty(selected) : qty;
+              const clamped = selected && maxQty > 0 ? Math.min(qty, maxQty) : qty;
+              onUpdate(index, 'qty', clamped);
+              onUpdate(index, 'total', clamped * (item.unitPrice || 0));
             }}
           />
         </View>
@@ -256,6 +274,21 @@ export default function CreateOrderScreen() {
     if (!countryCode.trim()) { setError('Country code is required'); setShowError(true); return; }
     const validItems = items.filter(i => i.productId && i.qty > 0 && i.unitPrice > 0);
     if (validItems.length === 0) { setError('Please add at least one valid item'); setShowError(true); return; }
+    for (const line of validItems) {
+      const p = products.find((prod) => prod.id === line.productId);
+      const stock = p ? productStockQty(p) : 0;
+      const label = p ? `${p.productNo} — ${p.name}` : `Product #${line.productId}`;
+      if (stock <= 0) {
+        setError(`No available stock for ${label}`);
+        setShowError(true);
+        return;
+      }
+      if (line.qty > stock) {
+        setError(`Insufficient stock for ${label}. Available: ${stock}`);
+        setShowError(true);
+        return;
+      }
+    }
     if (etrRequired) {
       if (!etrCompanyName.trim()) { setError('Company name is required when ETR is required'); setShowError(true); return; }
       if (!etrCompanyKraPin.trim()) { setError('Company KRA PIN is required when ETR is required'); setShowError(true); return; }
