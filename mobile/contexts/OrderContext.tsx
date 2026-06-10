@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { SalesOrder, Customer, Product, OrderItem } from '@/types/erp';
+import { SalesOrder, Customer, Product, OrderItem, PageResult } from '@/types/erp';
 import { apiRequest } from './AuthContext';
 import { useAuth } from './AuthContext';
 
@@ -45,8 +45,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsLoading(true);
     try {
-      const data = await apiRequest<SalesOrder[]>('/orders/mine', {}, user.token);
-      setOrders(data);
+      const data = await apiRequest<PageResult<SalesOrder>>('/orders/mine?page=1&size=100', {}, user.token);
+      setOrders(data.records);
     } finally {
       setIsLoading(false);
     }
@@ -67,8 +67,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     setIsLoading(true);
     try {
-      const data = await apiRequest<SalesOrder[]>('/orders', {}, user.token);
-      setOrders(data);
+      const data = await apiRequest<PageResult<SalesOrder>>('/orders?page=1&size=100', {}, user.token);
+      setOrders(data.records);
     } finally {
       setIsLoading(false);
     }
