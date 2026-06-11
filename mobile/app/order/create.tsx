@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, FlatList, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, Switch,
+  StyleSheet, FlatList, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, Switch, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/contexts/OrderContext';
 import { Customer, Product, OrderItem } from '@/types/erp';
@@ -186,18 +186,46 @@ function ProductRow({
       <View style={styles.qtyRow}>
         <View style={styles.qtyInput}>
           <Text style={styles.label}>Qty</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={String(item.qty || '')}
-            onChangeText={v => {
-              const qty = parseInt(v) || 0;
-              const maxQty = selected ? productStockQty(selected) : qty;
-              const clamped = selected && maxQty > 0 ? Math.min(qty, maxQty) : qty;
-              onUpdate(index, 'qty', clamped);
-              onUpdate(index, 'total', clamped * (item.unitPrice || 0));
-            }}
-          />
+          <View style={styles.stepper}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => {
+                const next = Math.max(1, (item.qty || 1) - 1);
+                onUpdate(index, 'qty', next);
+                onUpdate(index, 'total', next * (item.unitPrice || 0));
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.stepInput}
+              keyboardType="number-pad"
+              value={String(item.qty || '')}
+              onChangeText={v => {
+                const qty = parseInt(v) || 0;
+                const maxQty = selected ? productStockQty(selected) : qty;
+                const clamped = selected && maxQty > 0 ? Math.min(qty, maxQty) : qty;
+                onUpdate(index, 'qty', clamped);
+                onUpdate(index, 'total', clamped * (item.unitPrice || 0));
+              }}
+            />
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => {
+                const maxQty = selected ? productStockQty(selected) : Number.MAX_SAFE_INTEGER;
+                const next = Math.min(maxQty, (item.qty || 0) + 1);
+                onUpdate(index, 'qty', next);
+                onUpdate(index, 'total', next * (item.unitPrice || 0));
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+          {selected ? (
+            <Text style={styles.stockHint}>Stock: {productStockQty(selected)}</Text>
+          ) : null}
         </View>
         <View style={styles.qtyInput}>
           <Text style={styles.label}>Unit Price (KSh)</Text>
@@ -222,22 +250,9 @@ function ProductRow({
 export default function CreateOrderScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
-  const { createOrder, products } = useOrders();
-
-  useEffect(() => {
-    if (user && user.role !== 'SALES' && user.role !== 'ADMIN') {
-      router.replace('/(tabs)');
-    }
-  }, [user, router]);
-
-  if (!user || (user.role !== 'SALES' && user.role !== 'ADMIN')) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#1D4ED8" />
-      </View>
-    );
-  }
+  const { createOrder, submitOrder, products } = useOrders();
 
   const [shipTo, setShipTo] = useState<Customer | null>(null);
   const [billTo, setBillTo] = useState<Customer | null>(null);
@@ -251,10 +266,101 @@ export default function CreateOrderScreen() {
   const [remark, setRemark] = useState('');
   const [items, setItems] = useState<OrderItem[]>([{ productId: 0, qty: 1, unitPrice: 0, total: 0 }]);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showError, setShowError] = useState(false);
 
+  const isAuthorized = Boolean(user && (user.role === 'SALES' || user.role === 'ADMIN'));
   const totalAmount = items.reduce((s, i) => s + (i.total || 0), 0);
+  const isBusy = saving || submitting;
+  const hasDraft =
+    shipTo != null ||
+    billTo != null ||
+    remark.trim().length > 0 ||
+    items.some((i) => i.productId > 0 || i.qty !== 1 || i.unitPrice > 0);
+
+  useEffect(() => {
+    if (user && user.role !== 'SALES' && user.role !== 'ADMIN') {
+      router.replace('/(tabs)');
+    }
+  }, [user, router]);
+
+  useEffect(() => {
+    if (!isAuthorized) return;
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasDraft || isBusy) return;
+      e.preventDefault();
+      Alert.alert('Leave without saving?', 'Your changes will be lost.', [
+        { text: 'Stay', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      ]);
+    });
+    return unsubscribe;
+  }, [navigation, hasDraft, isBusy, isAuthorized]);
+
+  if (!isAuthorized) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#1D4ED8" />
+      </View>
+    );
+  }
+
+  const validateForm = (): OrderItem[] | null => {
+    if (!shipTo) { setError('Please select Ship-To customer'); setShowError(true); return null; }
+    const billToId = sameBillShip ? shipTo.id : billTo?.id;
+    if (!billToId) { setError('Please select Bill-To customer'); setShowError(true); return null; }
+    if (!countryCode.trim()) { setError('Country code is required'); setShowError(true); return null; }
+    const validItems = items.filter(i => i.productId && i.qty > 0 && i.unitPrice > 0);
+    if (validItems.length === 0) { setError('Please add at least one valid item'); setShowError(true); return null; }
+    for (const line of validItems) {
+      const p = products.find((prod) => prod.id === line.productId);
+      const stock = p ? productStockQty(p) : 0;
+      const label = p ? `${p.productNo} — ${p.name}` : `Product #${line.productId}`;
+      if (stock <= 0) {
+        setError(`No available stock for ${label}`);
+        setShowError(true);
+        return null;
+      }
+      if (line.qty > stock) {
+        setError(`Insufficient stock for ${label}. Available: ${stock}`);
+        setShowError(true);
+        return null;
+      }
+    }
+    if (etrRequired) {
+      if (!etrCompanyName.trim()) { setError('Company name is required when ETR is required'); setShowError(true); return null; }
+      if (!etrCompanyKraPin.trim()) { setError('Company KRA PIN is required when ETR is required'); setShowError(true); return null; }
+    }
+    return validItems;
+  };
+
+  const buildPayload = (validItems: OrderItem[]) => {
+    const billToId = sameBillShip ? shipTo!.id : billTo!.id;
+    return {
+      shipToCustomerId: shipTo!.id,
+      billToCustomerId: billToId,
+      countryCode: countryCode.trim(),
+      paymentMethod,
+      priceTerm,
+      remark,
+      ...(etrRequired
+        ? { etrRequired: true, etrCompanyName: etrCompanyName.trim(), etrCompanyKraPin: etrCompanyKraPin.trim() }
+        : {}),
+      items: validItems,
+    };
+  };
+
+  const handleGoBack = () => {
+    if (hasDraft) {
+      Alert.alert('Leave without saving?', 'Your changes will be lost.', [
+        { text: 'Stay', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => router.back() },
+      ]);
+      return;
+    }
+    router.back();
+  };
 
   const addItem = () => setItems(prev => [...prev, { productId: 0, qty: 1, unitPrice: 0, total: 0 }]);
 
@@ -268,46 +374,12 @@ export default function CreateOrderScreen() {
   };
 
   const handleSaveDraft = async () => {
-    if (!shipTo) { setError('Please select Ship-To customer'); setShowError(true); return; }
-    const billToId = sameBillShip ? shipTo.id : billTo?.id;
-    if (!billToId) { setError('Please select Bill-To customer'); setShowError(true); return; }
-    if (!countryCode.trim()) { setError('Country code is required'); setShowError(true); return; }
-    const validItems = items.filter(i => i.productId && i.qty > 0 && i.unitPrice > 0);
-    if (validItems.length === 0) { setError('Please add at least one valid item'); setShowError(true); return; }
-    for (const line of validItems) {
-      const p = products.find((prod) => prod.id === line.productId);
-      const stock = p ? productStockQty(p) : 0;
-      const label = p ? `${p.productNo} — ${p.name}` : `Product #${line.productId}`;
-      if (stock <= 0) {
-        setError(`No available stock for ${label}`);
-        setShowError(true);
-        return;
-      }
-      if (line.qty > stock) {
-        setError(`Insufficient stock for ${label}. Available: ${stock}`);
-        setShowError(true);
-        return;
-      }
-    }
-    if (etrRequired) {
-      if (!etrCompanyName.trim()) { setError('Company name is required when ETR is required'); setShowError(true); return; }
-      if (!etrCompanyKraPin.trim()) { setError('Company KRA PIN is required when ETR is required'); setShowError(true); return; }
-    }
+    const validItems = validateForm();
+    if (!validItems) return;
 
     setSaving(true);
     try {
-      await createOrder({
-        shipToCustomerId: shipTo.id,
-        billToCustomerId: billToId,
-        countryCode: countryCode.trim(),
-        paymentMethod,
-        priceTerm,
-        remark,
-        ...(etrRequired
-          ? { etrRequired: true, etrCompanyName: etrCompanyName.trim(), etrCompanyKraPin: etrCompanyKraPin.trim() }
-          : {}),
-        items: validItems,
-      });
+      await createOrder(buildPayload(validItems));
       router.back();
     } catch (e: any) {
       setError(e.message);
@@ -317,9 +389,31 @@ export default function CreateOrderScreen() {
     }
   };
 
+  const handleSubmit = async () => {
+    const validItems = validateForm();
+    if (!validItems) return;
+
+    setSubmitting(true);
+    try {
+      const order = await createOrder(buildPayload(validItems));
+      await submitOrder(order.id);
+      router.replace(`/order/${order.id}` as any);
+    } catch (e: any) {
+      setError(e.message);
+      setShowError(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer</Text>
           <CustomerPicker label="Ship To (Delivery)" selected={shipTo} onSelect={c => {
@@ -394,7 +488,7 @@ export default function CreateOrderScreen() {
               onRemove={removeItem}
             />
           ))}
-          <TouchableOpacity style={styles.addItemBtn} onPress={addItem}>
+          <TouchableOpacity style={styles.addItemBtn} onPress={addItem} activeOpacity={0.7}>
             <Text style={styles.addItemText}>+ Add Item</Text>
           </TouchableOpacity>
 
@@ -405,11 +499,46 @@ export default function CreateOrderScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={styles.draftBtn} onPress={handleSaveDraft} disabled={saving}>
-          {saving ? <ActivityIndicator color="#1D4ED8" /> : <Text style={styles.draftBtnText}>Save Draft</Text>}
-        </TouchableOpacity>
+      {/* Bottom action bar — thumb-friendly zone */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+        <View style={styles.bottomSummary}>
+          <Text style={styles.bottomSummaryLabel}>Total</Text>
+          <Text style={styles.bottomSummaryValue}>KSh {totalAmount.toLocaleString()}</Text>
+        </View>
+        <View style={styles.bottomActions}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={handleGoBack}
+            disabled={isBusy}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backBtnText}>Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.draftBtn}
+            onPress={handleSaveDraft}
+            disabled={isBusy}
+            activeOpacity={0.7}
+          >
+            {saving ? (
+              <ActivityIndicator color="#1D4ED8" />
+            ) : (
+              <Text style={styles.draftBtnText}>Save Draft</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={handleSubmit}
+            disabled={isBusy}
+            activeOpacity={0.7}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.submitBtnText}>Submit</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Error Modal */}
@@ -429,6 +558,7 @@ export default function CreateOrderScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#F8FAFF' },
   container: { flex: 1, backgroundColor: '#F8FAFF' },
   section: { backgroundColor: '#FFF', margin: 16, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E3A5F', marginBottom: 12 },
@@ -456,15 +586,95 @@ const styles = StyleSheet.create({
   productPicker: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 10, padding: 12, backgroundColor: '#FFF' },
   qtyRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
   qtyInput: { flex: 1 },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    backgroundColor: '#FFF',
+    overflow: 'hidden',
+  },
+  stepBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  stepBtnText: { fontSize: 22, fontWeight: '700', color: '#1D4ED8', lineHeight: 24 },
+  stepInput: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1F2937',
+    paddingVertical: 10,
+    minWidth: 48,
+  },
+  stockHint: { fontSize: 11, color: '#6B7280', marginTop: 4 },
   lineTotal: { fontSize: 13, fontWeight: '700', color: '#1D4ED8', marginTop: 8, textAlign: 'right' },
-  addItemBtn: { borderWidth: 2, borderColor: '#1D4ED8', borderStyle: 'dashed', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 4 },
+  addItemBtn: { borderWidth: 2, borderColor: '#1D4ED8', borderStyle: 'dashed', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 4, minHeight: 52 },
   addItemText: { color: '#1D4ED8', fontWeight: '700', fontSize: 14 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#1E3A5F' },
   totalValue: { fontSize: 20, fontWeight: '800', color: '#1D4ED8' },
-  bottomBar: { backgroundColor: '#FFF', paddingHorizontal: 20, paddingTop: 12, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 8 },
-  draftBtn: { backgroundColor: '#1D4ED8', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
-  draftBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  bottomSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  bottomSummaryLabel: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  bottomSummaryValue: { fontSize: 18, fontWeight: '800', color: '#1D4ED8' },
+  bottomActions: { flexDirection: 'row', gap: 8 },
+  backBtn: {
+    minHeight: 50,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  backBtnText: { color: '#374151', fontSize: 15, fontWeight: '700' },
+  draftBtn: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#1D4ED8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF',
+  },
+  draftBtnText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
+  submitBtn: {
+    flex: 1.2,
+    minHeight: 50,
+    backgroundColor: '#1D4ED8',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
   searchModal: { flex: 1, backgroundColor: '#F8FAFF', paddingTop: 48 },
   searchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 },
   searchTitle: { fontSize: 20, fontWeight: '700', color: '#1E3A5F' },
