@@ -406,11 +406,17 @@ export default function CreateOrderScreen() {
     }
   };
 
+  const ScreenWrapper = Platform.OS === 'web' ? View : KeyboardAvoidingView;
+  const screenWrapperProps =
+    Platform.OS === 'web'
+      ? { style: styles.screen }
+      : { style: styles.screen, behavior: Platform.OS === 'ios' ? ('padding' as const) : ('height' as const) };
+
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <ScreenWrapper {...screenWrapperProps}>
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 140 }}
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 16 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -553,13 +559,13 @@ export default function CreateOrderScreen() {
           </View>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFF' },
-  container: { flex: 1, backgroundColor: '#F8FAFF' },
+  scroll: { flex: 1, backgroundColor: '#F8FAFF' },
   section: { backgroundColor: '#FFF', margin: 16, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E3A5F', marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 10 },
@@ -620,10 +626,6 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#1E3A5F' },
   totalValue: { fontSize: 20, fontWeight: '800', color: '#1D4ED8' },
   bottomBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: '#FFF',
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -633,6 +635,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 12,
+    zIndex: 10,
   },
   bottomSummary: {
     flexDirection: 'row',
