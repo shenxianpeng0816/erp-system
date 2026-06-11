@@ -15,7 +15,7 @@ export default function OrderLayout() {
         ...(Platform.OS === 'web' ? { headerBackVisible: false } : {}),
       }}
     >
-      <Stack.Screen name="create" options={{ title: 'New Order' }} />
+      <Stack.Screen name="create" options={{ headerShown: true }} />
       <Stack.Screen name="[id]" options={{ title: 'Order Detail' }} />
     </Stack>
   );

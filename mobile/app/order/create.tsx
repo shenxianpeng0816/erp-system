@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, FlatList, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, Switch, Alert,
+  ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useNavigation, Stack } from 'expo-router';
@@ -248,6 +249,13 @@ function ProductRow({
 
 const BOTTOM_BAR_HEIGHT = 120;
 
+const bottomBarStyle = (Platform.OS === 'web'
+  ? { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 9999, width: '100%' }
+  : { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 9999 }
+) as ViewStyle;
+
+const HEADER_SIDE_WIDTH = 72;
+
 // ── Main Screen ────────────────────────────────────────────────────────────
 export default function CreateOrderScreen() {
   const insets = useSafeAreaInsets();
@@ -411,13 +419,16 @@ export default function CreateOrderScreen() {
   const ScreenWrapper = Platform.OS === 'web' ? View : KeyboardAvoidingView;
   const screenWrapperProps =
     Platform.OS === 'web'
-      ? { style: styles.screen }
-      : { style: styles.screen, behavior: Platform.OS === 'ios' ? ('padding' as const) : ('height' as const) };
+      ? { style: styles.body }
+      : { style: styles.body, behavior: Platform.OS === 'ios' ? ('padding' as const) : ('height' as const) };
 
   return (
     <>
       <Stack.Screen
         options={{
+          headerTitle: 'New Order',
+          headerTitleAlign: 'center',
+          headerTitleStyle: { color: '#FFFFFF', fontWeight: '700', fontSize: 17 },
           headerLeft: () => (
             <TouchableOpacity
               onPress={handleGoBack}
@@ -427,15 +438,17 @@ export default function CreateOrderScreen() {
               <Text style={styles.headerBackText}>← Back</Text>
             </TouchableOpacity>
           ),
+          headerRight: () => <View style={styles.headerSideSpacer} />,
         }}
       />
-      <ScreenWrapper {...screenWrapperProps}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={{ paddingBottom: BOTTOM_BAR_HEIGHT + insets.bottom + 16 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.page}>
+        <ScreenWrapper {...screenWrapperProps}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={{ paddingBottom: BOTTOM_BAR_HEIGHT + insets.bottom + 16 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Customer</Text>
           <CustomerPicker label="Ship To (Delivery)" selected={shipTo} onSelect={c => {
@@ -519,81 +532,87 @@ export default function CreateOrderScreen() {
             <Text style={styles.totalValue}>KSh {totalAmount.toLocaleString()}</Text>
           </View>
         </View>
-      </ScrollView>
+          </ScrollView>
+        </ScreenWrapper>
 
-      {/* Bottom action bar — thumb-friendly zone */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
-        <View style={styles.bottomSummary}>
-          <Text style={styles.bottomSummaryLabel}>Total</Text>
-          <Text style={styles.bottomSummaryValue}>KSh {totalAmount.toLocaleString()}</Text>
-        </View>
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={handleGoBack}
-            disabled={isBusy}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.backBtnText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.draftBtn}
-            onPress={handleSaveDraft}
-            disabled={isBusy}
-            activeOpacity={0.7}
-          >
-            {saving ? (
-              <ActivityIndicator color="#1D4ED8" />
-            ) : (
-              <Text style={styles.draftBtnText}>Save Draft</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.submitBtn}
-            onPress={handleSubmit}
-            disabled={isBusy}
-            activeOpacity={0.7}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.submitBtnText}>Submit</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Error Modal */}
-      <Modal visible={showError} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Notice</Text>
-            <Text style={styles.modalMsg}>{error}</Text>
-            <TouchableOpacity style={styles.modalBtn} onPress={() => setShowError(false)}>
-              <Text style={styles.modalBtnText}>OK</Text>
+        {/* 底栏放在 overflow 容器外，Web 端 fixed 才不会被裁切 */}
+        <View style={[styles.bottomBar, bottomBarStyle, { paddingBottom: insets.bottom + 10 }]}>
+          <View style={styles.bottomSummary}>
+            <Text style={styles.bottomSummaryLabel}>Total</Text>
+            <Text style={styles.bottomSummaryValue}>KSh {totalAmount.toLocaleString()}</Text>
+          </View>
+          <View style={styles.bottomActions}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={handleGoBack}
+              disabled={isBusy}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.backBtnText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.draftBtn}
+              onPress={handleSaveDraft}
+              disabled={isBusy}
+              activeOpacity={0.7}
+            >
+              {saving ? (
+                <ActivityIndicator color="#1D4ED8" />
+              ) : (
+                <Text style={styles.draftBtnText}>Save Draft</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.submitBtn}
+              onPress={handleSubmit}
+              disabled={isBusy}
+              activeOpacity={0.7}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.submitBtnText}>Submit</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-      </ScreenWrapper>
+
+        <Modal visible={showError} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Notice</Text>
+              <Text style={styles.modalMsg}>{error}</Text>
+              <TouchableOpacity style={styles.modalBtn} onPress={() => setShowError(false)}>
+                <Text style={styles.modalBtnText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  page: {
     flex: 1,
     backgroundColor: '#F8FAFF',
+    position: 'relative',
+    ...(Platform.OS === 'web' ? { height: '100%' as const } : {}),
+  },
+  body: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
+    minHeight: 0,
     overflow: 'hidden',
-    ...(Platform.OS === 'web' ? { height: '100%' as const, minHeight: 0 } : {}),
   },
   scroll: {
     flex: 1,
     backgroundColor: '#F8FAFF',
-    ...(Platform.OS === 'web' ? { minHeight: 0 } : {}),
   },
-  headerBackBtn: { paddingHorizontal: 4, paddingVertical: 6 },
+  headerBackBtn: { paddingHorizontal: 4, paddingVertical: 6, minWidth: HEADER_SIDE_WIDTH },
   headerBackText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  headerSideSpacer: { width: HEADER_SIDE_WIDTH },
   section: { backgroundColor: '#FFF', margin: 16, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E3A5F', marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 10 },
@@ -654,9 +673,6 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#1E3A5F' },
   totalValue: { fontSize: 20, fontWeight: '800', color: '#1D4ED8' },
   bottomBar: {
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: '#FFF',
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -666,15 +682,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 12,
-    zIndex: 100,
-    ...Platform.select({
-      web: {
-        position: 'fixed' as 'absolute',
-      },
-      default: {
-        position: 'absolute',
-      },
-    }),
   },
   bottomSummary: {
     flexDirection: 'row',
