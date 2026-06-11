@@ -4,7 +4,7 @@ import {
   StyleSheet, FlatList, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, Switch, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useNavigation } from 'expo-router';
+import { useRouter, useNavigation, Stack } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/contexts/OrderContext';
 import { Customer, Product, OrderItem } from '@/types/erp';
@@ -246,6 +246,8 @@ function ProductRow({
   );
 }
 
+const BOTTOM_BAR_HEIGHT = 120;
+
 // ── Main Screen ────────────────────────────────────────────────────────────
 export default function CreateOrderScreen() {
   const insets = useSafeAreaInsets();
@@ -413,10 +415,24 @@ export default function CreateOrderScreen() {
       : { style: styles.screen, behavior: Platform.OS === 'ios' ? ('padding' as const) : ('height' as const) };
 
   return (
-    <ScreenWrapper {...screenWrapperProps}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 16 }}
+    <>
+      <Stack.Screen
+        options={{
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={handleGoBack}
+              style={styles.headerBackBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={styles.headerBackText}>← Back</Text>
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <ScreenWrapper {...screenWrapperProps}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: BOTTOM_BAR_HEIGHT + insets.bottom + 16 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -559,13 +575,25 @@ export default function CreateOrderScreen() {
           </View>
         </View>
       </Modal>
-    </ScreenWrapper>
+      </ScreenWrapper>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFF' },
-  scroll: { flex: 1, backgroundColor: '#F8FAFF' },
+  screen: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
+    overflow: 'hidden',
+    ...(Platform.OS === 'web' ? { height: '100%' as const, minHeight: 0 } : {}),
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
+    ...(Platform.OS === 'web' ? { minHeight: 0 } : {}),
+  },
+  headerBackBtn: { paddingHorizontal: 4, paddingVertical: 6 },
+  headerBackText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   section: { backgroundColor: '#FFF', margin: 16, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E3A5F', marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 10 },
@@ -626,6 +654,9 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#1E3A5F' },
   totalValue: { fontSize: 20, fontWeight: '800', color: '#1D4ED8' },
   bottomBar: {
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#FFF',
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -635,7 +666,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 12,
-    zIndex: 10,
+    zIndex: 100,
+    ...Platform.select({
+      web: {
+        position: 'fixed' as 'absolute',
+      },
+      default: {
+        position: 'absolute',
+      },
+    }),
   },
   bottomSummary: {
     flexDirection: 'row',

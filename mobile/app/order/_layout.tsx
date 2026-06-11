@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 export default function OrderLayout() {
   return (
@@ -11,6 +12,7 @@ export default function OrderLayout() {
         headerShadowVisible: false,
         headerBackTitle: 'Back',
         contentStyle: { flex: 1, backgroundColor: '#F8FAFF' },
+        ...(Platform.OS === 'web' ? { headerBackVisible: false } : {}),
       }}
     >
       <Stack.Screen name="create" options={{ title: 'New Order' }} />
