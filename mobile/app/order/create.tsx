@@ -4,6 +4,7 @@ import {
   StyleSheet, FlatList, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, Switch, Alert,
   ViewStyle,
 } from 'react-native';
+import { createPortal } from 'react-dom';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useNavigation, Stack } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -249,12 +250,38 @@ function ProductRow({
 
 const BOTTOM_BAR_HEIGHT = 120;
 
-const bottomBarStyle = (Platform.OS === 'web'
-  ? { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 9999, width: '100%' }
-  : { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 9999 }
-) as ViewStyle;
+const bottomBarFixedStyle = {
+  position: 'fixed',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 99999,
+  width: '100%',
+  backgroundColor: '#FFFFFF',
+  boxShadow: '0 -2px 12px rgba(0,0,0,0.12)',
+} as unknown as ViewStyle;
 
 const HEADER_SIDE_WIDTH = 72;
+
+function WebBodyPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (Platform.OS !== 'web' || !mounted || typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+}
+
+function OrderCreateHeader({ onBack }: { onBack: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.customHeader, { paddingTop: insets.top + 8 }]}>
+      <TouchableOpacity onPress={onBack} style={styles.headerSideBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={styles.headerBackText}>← Back</Text>
+      </TouchableOpacity>
+      <Text style={styles.headerTitleText}>New Order</Text>
+      <View style={styles.headerSideBtn} />
+    </View>
+  );
+}
 
 // ── Main Screen ────────────────────────────────────────────────────────────
 export default function CreateOrderScreen() {
@@ -422,23 +449,58 @@ export default function CreateOrderScreen() {
       ? { style: styles.body }
       : { style: styles.body, behavior: Platform.OS === 'ios' ? ('padding' as const) : ('height' as const) };
 
+  const bottomBar = (
+    <View style={[
+      styles.bottomBar,
+      Platform.OS === 'web' ? bottomBarFixedStyle : styles.bottomBarNative,
+      { paddingBottom: insets.bottom + 10 },
+    ]}>
+      <View style={styles.bottomSummary}>
+        <Text style={styles.bottomSummaryLabel}>Total</Text>
+        <Text style={styles.bottomSummaryValue}>KSh {totalAmount.toLocaleString()}</Text>
+      </View>
+      <View style={styles.bottomActions}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={handleGoBack}
+          disabled={isBusy}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backBtnText}>Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.draftBtn}
+          onPress={handleSaveDraft}
+          disabled={isBusy}
+          activeOpacity={0.7}
+        >
+          {saving ? (
+            <ActivityIndicator color="#1D4ED8" />
+          ) : (
+            <Text style={styles.draftBtnText}>Save Draft</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={handleSubmit}
+          disabled={isBusy}
+          activeOpacity={0.7}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.submitBtnText}>Submit</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <>
       <Stack.Screen
         options={{
-          headerTitle: 'New Order',
-          headerTitleAlign: 'center',
-          headerTitleStyle: { color: '#FFFFFF', fontWeight: '700', fontSize: 17 },
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={handleGoBack}
-              style={styles.headerBackBtn}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Text style={styles.headerBackText}>← Back</Text>
-            </TouchableOpacity>
-          ),
-          headerRight: () => <View style={styles.headerSideSpacer} />,
+          header: () => <OrderCreateHeader onBack={handleGoBack} />,
         }}
       />
       <View style={styles.page}>
@@ -535,47 +597,11 @@ export default function CreateOrderScreen() {
           </ScrollView>
         </ScreenWrapper>
 
-        {/* 底栏放在 overflow 容器外，Web 端 fixed 才不会被裁切 */}
-        <View style={[styles.bottomBar, bottomBarStyle, { paddingBottom: insets.bottom + 10 }]}>
-          <View style={styles.bottomSummary}>
-            <Text style={styles.bottomSummaryLabel}>Total</Text>
-            <Text style={styles.bottomSummaryValue}>KSh {totalAmount.toLocaleString()}</Text>
-          </View>
-          <View style={styles.bottomActions}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={handleGoBack}
-              disabled={isBusy}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.backBtnText}>Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.draftBtn}
-              onPress={handleSaveDraft}
-              disabled={isBusy}
-              activeOpacity={0.7}
-            >
-              {saving ? (
-                <ActivityIndicator color="#1D4ED8" />
-              ) : (
-                <Text style={styles.draftBtnText}>Save Draft</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.submitBtn}
-              onPress={handleSubmit}
-              disabled={isBusy}
-              activeOpacity={0.7}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.submitBtnText}>Submit</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+        {Platform.OS === 'web' ? (
+          <WebBodyPortal>{bottomBar}</WebBodyPortal>
+        ) : (
+          bottomBar
+        )}
 
         <Modal visible={showError} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -610,9 +636,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFF',
   },
-  headerBackBtn: { paddingHorizontal: 4, paddingVertical: 6, minWidth: HEADER_SIDE_WIDTH },
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1D4ED8',
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+  },
+  headerSideBtn: {
+    width: HEADER_SIDE_WIDTH,
+    justifyContent: 'center',
+  },
+  headerTitleText: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
   headerBackText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  headerSideSpacer: { width: HEADER_SIDE_WIDTH },
   section: { backgroundColor: '#FFF', margin: 16, marginBottom: 0, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E3A5F', marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 10 },
@@ -683,6 +725,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
+  bottomBarNative: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+  },
   bottomSummary: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -692,9 +741,15 @@ const styles = StyleSheet.create({
   },
   bottomSummaryLabel: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
   bottomSummaryValue: { fontSize: 18, fontWeight: '800', color: '#1D4ED8' },
-  bottomActions: { flexDirection: 'row', gap: 8 },
+  bottomActions: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'stretch',
+    width: '100%',
+  },
   backBtn: {
     minHeight: 50,
+    minWidth: 64,
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1.5,
@@ -712,7 +767,7 @@ const styles = StyleSheet.create({
     borderColor: '#1D4ED8',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
   },
   draftBtnText: { color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
   submitBtn: {
