@@ -2,9 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, FlatList, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, Switch, Alert,
-  ViewStyle,
 } from 'react-native';
-import { createPortal } from 'react-dom';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useNavigation, Stack } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -250,25 +248,7 @@ function ProductRow({
 
 const BOTTOM_BAR_HEIGHT = 120;
 
-const bottomBarFixedStyle = {
-  position: 'fixed',
-  left: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 99999,
-  width: '100%',
-  backgroundColor: '#FFFFFF',
-  boxShadow: '0 -2px 12px rgba(0,0,0,0.12)',
-} as unknown as ViewStyle;
-
 const HEADER_SIDE_WIDTH = 72;
-
-function WebBodyPortal({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (Platform.OS !== 'web' || !mounted || typeof document === 'undefined') return null;
-  return createPortal(children, document.body);
-}
 
 function OrderCreateHeader({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
@@ -452,7 +432,6 @@ export default function CreateOrderScreen() {
   const bottomBar = (
     <View style={[
       styles.bottomBar,
-      Platform.OS === 'web' ? bottomBarFixedStyle : styles.bottomBarNative,
       { paddingBottom: insets.bottom + 10 },
     ]}>
       <View style={styles.bottomSummary}>
@@ -597,11 +576,7 @@ export default function CreateOrderScreen() {
           </ScrollView>
         </ScreenWrapper>
 
-        {Platform.OS === 'web' ? (
-          <WebBodyPortal>{bottomBar}</WebBodyPortal>
-        ) : (
-          bottomBar
-        )}
+        {bottomBar}
 
         <Modal visible={showError} transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -715,6 +690,11 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '700', color: '#1E3A5F' },
   totalValue: { fontSize: 20, fontWeight: '800', color: '#1D4ED8' },
   bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
     backgroundColor: '#FFF',
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -724,13 +704,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 12,
-  },
-  bottomBarNative: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
   },
   bottomSummary: {
     flexDirection: 'row',
