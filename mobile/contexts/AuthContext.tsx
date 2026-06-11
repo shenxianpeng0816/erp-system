@@ -3,8 +3,11 @@ import { storage } from '@/utils/storage';
 import { AuthUser } from '@/types/erp';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-// Change this to your backend IP/host when deploying
-export const API_BASE = 'http://localhost:8080/api';
+// 部署时通过环境变量注入，deploy 脚本会写入 .env（EXPO_PUBLIC_API_BASE / NEXT_PUBLIC_API_BASE）
+export const API_BASE =
+  process.env.EXPO_PUBLIC_API_BASE ??
+  process.env.NEXT_PUBLIC_API_BASE ??
+  'http://localhost:8080/api';
 
 // ── API Helper ────────────────────────────────────────────────────────────────
 export async function apiRequest<T>(
