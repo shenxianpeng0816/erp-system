@@ -7,6 +7,8 @@
     "start-web": "expo start --web",
     "start-tunnel": "expo start --tunnel",
     "start-web-tunnel": "expo start --tunnel --web",
+    "build:web": "expo export --platform web",
+    "start:prod": "serve dist -s",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "lint": "expo lint"
@@ -53,6 +55,7 @@
     "@types/react": "~19.1.10",
     "eslint": "^9.31.0",
     "eslint-config-expo": "~10.0.0",
+    "serve": "^14.2.6",
     "typescript": "~5.9.2"
   },
   "private": true
