@@ -1,33 +1,8 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { storage } from '@/utils/storage';
 import { AuthUser } from '@/types/erp';
+import { apiRequest, setUnauthorizedHandler } from '@/lib/api';
 
-// ── Config ────────────────────────────────────────────────────────────────────
-// 部署时通过环境变量注入，deploy 脚本会写入 .env（EXPO_PUBLIC_API_BASE / NEXT_PUBLIC_API_BASE）
-export const API_BASE =
-  process.env.EXPO_PUBLIC_API_BASE ??
-  process.env.NEXT_PUBLIC_API_BASE ??
-  'http://localhost:8080/api';
-
-// ── API Helper ────────────────────────────────────────────────────────────────
-export async function apiRequest<T>(
-  path: string,
-  options: RequestInit = {},
-  token?: string
-): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const data = await res.json();
-  if (data.code !== 200) throw new Error(data.message || 'Request failed');
-  return data.data;
-}
-
-// ── Auth Context ──────────────────────────────────────────────────────────────
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
@@ -41,9 +16,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const logout = useCallback(async () => {
+    await storage.remove('ERP_USER');
+    setUser(null);
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   useEffect(() => {
     storage.get<AuthUser>('ERP_USER').then((u) => {
-      setUser(u ?? null);
+      if (u?.token) {
+        setUser(u);
+      } else {
+        setUser(null);
+      }
       setIsLoading(false);
     });
   }, []);
@@ -53,13 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
+    if (!data?.token) {
+      throw new Error('Login response missing token');
+    }
     await storage.set('ERP_USER', data);
     setUser(data);
-  }, []);
-
-  const logout = useCallback(async () => {
-    await storage.remove('ERP_USER');
-    setUser(null);
   }, []);
 
   const value = useMemo(() => ({ user, isLoading, login, logout }), [user, isLoading, login, logout]);
@@ -72,3 +61,7 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 };
+
+// Re-export for modules that already import apiRequest from AuthContext
+export { apiRequest } from '@/lib/api';
+export { API_BASE } from '@/lib/api';
