@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Slot, useRouter, useSegments, useRootNavigationState } from "expo-router";
+import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -47,9 +47,12 @@ export default function RootLayout() {
       <AuthProvider>
         <OrderProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            {/* AuthGuard watches login state and redirects accordingly */}
             <AuthGuard />
-            <Slot />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="order" options={{ headerShown: false }} />
+            </Stack>
           </GestureHandlerRootView>
         </OrderProvider>
       </AuthProvider>

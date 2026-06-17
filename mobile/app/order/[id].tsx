@@ -105,6 +105,8 @@ export default function OrderDetailScreen() {
       );
       setOrder(updated);
       setShowApproval(false);
+      setComment('');
+      setRedirectTo('');
       await load();
     } finally {
       setActing(false);
@@ -128,10 +130,11 @@ export default function OrderDetailScreen() {
   if (!order) return <View style={styles.center}><Text>Order not found</Text></View>;
 
   const hideOrderMoney = hideOrderAmountsForRole(user?.role);
-  const isOrderOwner = user != null && order.salesUserId === user.userId;
+  const currentUserId = Number(user?.userId);
+  const isOrderOwner = Number.isFinite(currentUserId) && order.salesUserId === currentUserId;
   const canSubmit = order.status === 'DRAFT' && isOrderOwner;
-  const canApprove = order.status === 'PENDING_APPROVAL' && user?.role === 'ADMIN';
-  const canConfirm = order.status === 'SHIPPED' && (user?.role === 'SALES' || user?.role === 'ADMIN');
+  const canApprove = order.status === 'PENDING_APPROVAL' && user?.role?.toUpperCase() === 'ADMIN';
+  const canConfirm = order.status === 'SHIPPED' && (user?.role?.toUpperCase() === 'SALES' || user?.role?.toUpperCase() === 'ADMIN');
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>

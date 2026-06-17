@@ -5,12 +5,12 @@ import { useAuth } from './AuthContext';
 
 export type AdminOrderListMode = 'pending' | 'all' | 'mine';
 
+export const ORDER_PAGE_SIZE = 10;
+
 interface OrderContextType {
   orders: SalesOrder[];
   isLoading: boolean;
-  fetchMyOrders: () => Promise<void>;
-  fetchPendingOrders: () => Promise<void>;
-  fetchAllOrders: () => Promise<void>;
+  fetchOrderListPage: (mode: AdminOrderListMode, page: number) => Promise<PageResult<SalesOrder>>;
   createOrder: (payload: {
     shipToCustomerId: number;
     billToCustomerId: number;
@@ -30,6 +30,7 @@ interface OrderContextType {
   products: Product[];
   searchCustomers: (keyword: string) => Promise<Customer[]>;
   fetchProducts: () => Promise<void>;
+  patchOrderInList: (order: SalesOrder) => void;
 }
 
 const OrderContext = createContext<OrderContextType | null>(null);
@@ -41,38 +42,35 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchMyOrders = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const data = await apiRequest<PageResult<SalesOrder>>('/orders/mine?page=1&size=100', {}, user.token);
-      setOrders(data.records);
-    } finally {
-      setIsLoading(false);
+  const fetchOrderListPage = useCallback(async (
+    mode: AdminOrderListMode,
+    page: number,
+  ): Promise<PageResult<SalesOrder>> => {
+    if (!user?.token) {
+      throw new Error('Not authenticated');
     }
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(ORDER_PAGE_SIZE),
+    });
+    if (mode === 'pending') {
+      params.set('status', 'PENDING_APPROVAL');
+    }
+    const path = mode === 'mine'
+      ? `/orders/mine?${params}`
+      : `/orders?${params}`;
+    const data = await apiRequest<PageResult<SalesOrder>>(path, {}, user.token);
+    return {
+      records: data?.records ?? [],
+      total: data?.total ?? 0,
+      current: data?.current ?? page,
+      size: data?.size ?? ORDER_PAGE_SIZE,
+    };
   }, [user]);
 
-  const fetchPendingOrders = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const data = await apiRequest<SalesOrder[]>('/orders/pending', {}, user.token);
-      setOrders(data);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const fetchAllOrders = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const data = await apiRequest<PageResult<SalesOrder>>('/orders?page=1&size=100', {}, user.token);
-      setOrders(data.records);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
+  const patchOrderInList = useCallback((order: SalesOrder) => {
+    setOrders(prev => prev.map(o => (o.id === order.id ? order : o)));
+  }, []);
 
   const createOrder = useCallback(async (payload: any) => {
     if (!user) throw new Error('Not authenticated');
@@ -126,13 +124,35 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       fetchProducts();
     }
-  }, [user]);
+  }, [user, fetchProducts]);
 
   const value = useMemo(() => ({
-    orders, isLoading, fetchMyOrders, fetchPendingOrders, fetchAllOrders,
-    createOrder, submitOrder, approveOrder, confirmDelivery,
-    customers, products, searchCustomers, fetchProducts,
-  }), [orders, isLoading, customers, products, fetchMyOrders, fetchPendingOrders, fetchAllOrders, createOrder, submitOrder, approveOrder, confirmDelivery, searchCustomers, fetchProducts]);
+    orders,
+    isLoading,
+    fetchOrderListPage,
+    createOrder,
+    submitOrder,
+    approveOrder,
+    confirmDelivery,
+    customers,
+    products,
+    searchCustomers,
+    fetchProducts,
+    patchOrderInList,
+  }), [
+    orders,
+    isLoading,
+    customers,
+    products,
+    fetchOrderListPage,
+    createOrder,
+    submitOrder,
+    approveOrder,
+    confirmDelivery,
+    searchCustomers,
+    fetchProducts,
+    patchOrderInList,
+  ]);
 
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
 }
