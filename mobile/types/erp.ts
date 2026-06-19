@@ -116,6 +116,9 @@ export interface Receivable {
   id: number;
   invoiceId: number;
   customerId: number;
+  productName?: string;
+  qty?: number;
+  unitPrice?: number;
   amount: number;
   receivedAmount: number;
   balance: number;
