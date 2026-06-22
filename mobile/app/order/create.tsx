@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useNavigation, Stack } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, apiRequest } from '@/contexts/AuthContext';
 import { useOrders } from '@/contexts/OrderContext';
-import { Customer, Product, OrderItem } from '@/types/erp';
+import { Customer, Product, OrderItem, Warehouse } from '@/types/erp';
 
 const COUNTRY_OPTIONS = [
   { code: 'KE', label: 'Kenya (KE)' },
@@ -103,6 +103,17 @@ function CustomerPicker({
       </Modal>
     </>
   );
+}
+
+function defaultWarehouseId(warehouses: Warehouse[]): number | null {
+  if (warehouses.length === 0) return null;
+  const def = warehouses.find((w) => w.isDefault);
+  return def?.id ?? warehouses[0].id;
+}
+
+function warehouseLabel(w: Warehouse): string {
+  const city = w.city?.trim();
+  return city ? `${w.name} (${city})` : w.name;
 }
 
 function productStockQty(p: Product): number {
@@ -269,11 +280,13 @@ export default function CreateOrderScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { createOrder, submitOrder, products } = useOrders();
+  const { createOrder, submitOrder, products, fetchProducts } = useOrders();
 
   const [shipTo, setShipTo] = useState<Customer | null>(null);
   const [billTo, setBillTo] = useState<Customer | null>(null);
   const [countryCode, setCountryCode] = useState('');
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [sameBillShip, setSameBillShip] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
   const [priceTerm, setPriceTerm] = useState('DDP Kenya');
@@ -315,6 +328,39 @@ export default function CreateOrderScreen() {
     return unsubscribe;
   }, [navigation, hasDraft, isBusy, isAuthorized]);
 
+  useEffect(() => {
+    if (!countryCode.trim()) {
+      setWarehouses([]);
+      setWarehouseId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await apiRequest<Warehouse[]>(
+          `/warehouses?countryCode=${encodeURIComponent(countryCode.trim())}`,
+          {},
+          user!.token,
+        );
+        if (cancelled) return;
+        setWarehouses(list);
+        setWarehouseId(defaultWarehouseId(list));
+      } catch {
+        if (!cancelled) {
+          setWarehouses([]);
+          setWarehouseId(null);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [countryCode, user]);
+
+  useEffect(() => {
+    if (warehouseId != null && warehouseId > 0) {
+      fetchProducts(warehouseId);
+    }
+  }, [warehouseId, fetchProducts]);
+
   if (!isAuthorized) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -328,6 +374,7 @@ export default function CreateOrderScreen() {
     const billToId = sameBillShip ? shipTo.id : billTo?.id;
     if (!billToId) { setError('Please select Bill-To customer'); setShowError(true); return null; }
     if (!countryCode.trim()) { setError('Country code is required'); setShowError(true); return null; }
+    if (warehouseId == null || warehouseId <= 0) { setError('Please select a ship-from warehouse'); setShowError(true); return null; }
     const validItems = items.filter(i => i.productId && i.qty > 0 && i.unitPrice > 0);
     if (validItems.length === 0) { setError('Please add at least one valid item'); setShowError(true); return null; }
     for (const line of validItems) {
@@ -358,6 +405,7 @@ export default function CreateOrderScreen() {
       shipToCustomerId: shipTo!.id,
       billToCustomerId: billToId,
       countryCode: countryCode.trim(),
+      warehouseId,
       paymentMethod,
       priceTerm,
       remark,
@@ -504,7 +552,10 @@ export default function CreateOrderScreen() {
               <TouchableOpacity
                 key={o.code}
                 style={[styles.countryChip, countryCode === o.code && styles.countryChipOn]}
-                onPress={() => setCountryCode(o.code)}
+                onPress={() => {
+                  setCountryCode(o.code);
+                  setWarehouseId(null);
+                }}
                 disabled={!shipTo}
               >
                 <Text style={[styles.countryChipText, countryCode === o.code && styles.countryChipTextOn]}>
@@ -513,6 +564,27 @@ export default function CreateOrderScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={styles.label}>Ship-from warehouse *</Text>
+          {warehouses.length === 0 ? (
+            <Text style={styles.hintText}>
+              {!countryCode ? 'Select country first' : 'No warehouse for this country'}
+            </Text>
+          ) : (
+            <View style={styles.countryRow}>
+              {warehouses.map((w) => (
+                <TouchableOpacity
+                  key={w.id}
+                  style={[styles.countryChip, warehouseId === w.id && styles.countryChipOn]}
+                  onPress={() => setWarehouseId(w.id)}
+                >
+                  <Text style={[styles.countryChipText, warehouseId === w.id && styles.countryChipTextOn]}>
+                    {warehouseLabel(w)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* Toggle: same ship/bill */}
           <TouchableOpacity style={styles.toggleRow} onPress={() => setSameBillShip(!sameBillShip)}>
@@ -649,6 +721,7 @@ const styles = StyleSheet.create({
   countryChipOn: { backgroundColor: '#1D4ED8', borderColor: '#1D4ED8' },
   countryChipText: { fontSize: 13, color: '#374151', fontWeight: '600' },
   countryChipTextOn: { color: '#FFF' },
+  hintText: { fontSize: 13, color: '#9CA3AF', marginTop: 4, marginBottom: 4 },
   productRow: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, marginBottom: 12, backgroundColor: '#F9FAFB' },
   productRowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   productRowTitle: { fontSize: 13, fontWeight: '700', color: '#374151' },

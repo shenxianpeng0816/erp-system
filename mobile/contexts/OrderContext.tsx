@@ -14,6 +14,8 @@ interface OrderContextType {
   createOrder: (payload: {
     shipToCustomerId: number;
     billToCustomerId: number;
+    countryCode: string;
+    warehouseId: number;
     paymentMethod?: string;
     priceTerm?: string;
     validityDays?: number;
@@ -29,7 +31,7 @@ interface OrderContextType {
   customers: Customer[];
   products: Product[];
   searchCustomers: (keyword: string) => Promise<Customer[]>;
-  fetchProducts: () => Promise<void>;
+  fetchProducts: (warehouseId?: number) => Promise<void>;
   patchOrderInList: (order: SalesOrder) => void;
 }
 
@@ -114,17 +116,14 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     return apiRequest<Customer[]>(`/customers/search?keyword=${encodeURIComponent(keyword)}`, {}, user.token);
   }, [user]);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (warehouseId?: number) => {
     if (!user) return;
-    const data = await apiRequest<Product[]>('/inventory/products', {}, user.token);
+    const path = warehouseId
+      ? `/inventory/products?warehouseId=${warehouseId}`
+      : '/inventory/products';
+    const data = await apiRequest<Product[]>(path, {}, user.token);
     setProducts(data);
   }, [user]);
-
-  useEffect(() => {
-    if (user) {
-      fetchProducts();
-    }
-  }, [user, fetchProducts]);
 
   const value = useMemo(() => ({
     orders,

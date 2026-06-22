@@ -41,6 +41,18 @@ export interface Product {
   stockQty?: number;
 }
 
+export interface Warehouse {
+  id: number;
+  warehouseCode: string;
+  name: string;
+  countryCode: string;
+  city?: string;
+  type: 'MAIN' | 'BRANCH';
+  address?: string;
+  isDefault?: boolean;
+  status?: number;
+}
+
 export interface OrderItem {
   id?: number;
   productId: number;
@@ -87,6 +99,8 @@ export interface SalesOrder {
   billToCustomerId: number;
   billToCustomerName?: string;
   countryCode?: string;
+  shipFromWarehouseId?: number;
+  shipFromWarehouseName?: string;
   status: OrderStatus;
   totalAmount: number;
   paymentMethod?: string;
