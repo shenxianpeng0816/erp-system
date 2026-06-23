@@ -59,7 +59,7 @@ function CustomerPicker({
             <Text style={styles.pickerSub}>{selected.customerNo} · {selected.type}</Text>
           </View>
         ) : (
-          <Text style={styles.pickerPlaceholder}>Search customer by name or code…</Text>
+          <Text style={styles.pickerPlaceholder}>Search customer by name or code (prefix)…</Text>
         )}
         <Text style={styles.pickerArrow}>›</Text>
       </TouchableOpacity>
@@ -74,7 +74,7 @@ function CustomerPicker({
           </View>
           <TextInput
             style={styles.searchInput}
-            placeholder="Type name or customer code..."
+            placeholder="Type start of name or customer code..."
             placeholderTextColor="#9CA3AF"
             value={query}
             onChangeText={doSearch}
