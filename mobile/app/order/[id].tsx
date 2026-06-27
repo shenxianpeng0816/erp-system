@@ -155,9 +155,10 @@ export default function OrderDetailScreen() {
           <Text style={styles.sectionTitle}>Customers</Text>
           <CustomerBlock
             label="Ship To"
-            name={order.shipToCustomerName ?? shipTo?.name}
+            name={order.shipToCustomerName ?? shipTo?.shopName ?? shipTo?.name}
             customer={shipTo}
             fallbackId={order.shipToCustomerId}
+            preferShopName
           />
           <CustomerBlock
             label="Bill To"
@@ -360,13 +361,18 @@ function CustomerBlock({
   name,
   customer,
   fallbackId,
+  preferShopName,
 }: {
   label: string;
   name?: string | null;
   customer: Customer | null;
   fallbackId: number;
+  preferShopName?: boolean;
 }) {
-  const displayName = name?.trim() || customer?.name?.trim() || `Customer #${fallbackId}`;
+  const customerFallback = preferShopName
+    ? (customer?.shopName?.trim() || customer?.name?.trim())
+    : customer?.name?.trim();
+  const displayName = name?.trim() || customerFallback || `Customer #${fallbackId}`;
   return (
     <View style={styles.customerBlock}>
       <Text style={styles.customerLabel}>{label}</Text>
