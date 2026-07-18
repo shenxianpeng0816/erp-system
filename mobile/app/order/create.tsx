@@ -8,18 +8,12 @@ import { useRouter, useNavigation, Stack } from 'expo-router';
 import { useAuth, apiRequest } from '@/contexts/AuthContext';
 import { useOrders } from '@/contexts/OrderContext';
 import { Customer, Product, OrderItem, Warehouse } from '@/types/erp';
-
-const COUNTRY_OPTIONS = [
-  { code: 'KE', label: 'Kenya (KE)' },
-  { code: 'UG', label: 'Uganda (UG)' },
-  { code: 'TZ', label: 'Tanzania (TZ)' },
-] as const;
-
-function defaultCountryFromCustomer(countryCode?: string | null): string {
-  const cc = countryCode?.trim().toUpperCase();
-  if (cc && COUNTRY_OPTIONS.some((o) => o.code === cc)) return cc;
-  return 'KE';
-}
+import {
+  COUNTRY_OPTIONS,
+  currencyUnit,
+  defaultCountryFromCustomer,
+  formatMoney,
+} from '@/lib/country';
 
 // ── Customer Search Picker ─────────────────────────────────────────────────
 function CustomerPicker({
@@ -125,12 +119,14 @@ function ProductRow({
   item,
   index,
   products,
+  countryCode,
   onUpdate,
   onRemove,
 }: {
   item: OrderItem;
   index: number;
   products: Product[];
+  countryCode?: string | null;
   onUpdate: (index: number, field: keyof OrderItem, value: any) => void;
   onRemove: (index: number) => void;
 }) {
@@ -186,7 +182,7 @@ function ProductRow({
               >
                 <Text style={styles.resultName}>{p.name}</Text>
                 <Text style={styles.resultSub}>
-                  {p.productNo} · KSh {Number(p.unitPrice).toLocaleString()} / {p.unit} · stock {productStockQty(p)}
+                  {p.productNo} · {formatMoney(p.unitPrice, countryCode)} / {p.unit} · stock {productStockQty(p)}
                 </Text>
               </TouchableOpacity>
             )}
@@ -239,7 +235,7 @@ function ProductRow({
           ) : null}
         </View>
         <View style={styles.qtyInput}>
-          <Text style={styles.label}>Unit Price (KSh)</Text>
+          <Text style={styles.label}>Unit Price ({currencyUnit(countryCode)})</Text>
           <TextInput
             style={styles.input}
             keyboardType="decimal-pad"
@@ -252,7 +248,7 @@ function ProductRow({
           />
         </View>
       </View>
-      <Text style={styles.lineTotal}>Line Total: KSh {Number(item.total || 0).toLocaleString()}</Text>
+      <Text style={styles.lineTotal}>Line Total: {formatMoney(item.total || 0, countryCode)}</Text>
     </View>
   );
 }
@@ -484,7 +480,7 @@ export default function CreateOrderScreen() {
     ]}>
       <View style={styles.bottomSummary}>
         <Text style={styles.bottomSummaryLabel}>Total</Text>
-        <Text style={styles.bottomSummaryValue}>KSh {totalAmount.toLocaleString()}</Text>
+        <Text style={styles.bottomSummaryValue}>{formatMoney(totalAmount, countryCode)}</Text>
       </View>
       <View style={styles.bottomActions}>
         <TouchableOpacity
@@ -632,6 +628,7 @@ export default function CreateOrderScreen() {
               item={item}
               index={idx}
               products={products}
+              countryCode={countryCode}
               onUpdate={updateItem}
               onRemove={removeItem}
             />
@@ -642,7 +639,7 @@ export default function CreateOrderScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>KSh {totalAmount.toLocaleString()}</Text>
+            <Text style={styles.totalValue}>{formatMoney(totalAmount, countryCode)}</Text>
           </View>
         </View>
           </ScrollView>

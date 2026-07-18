@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders, AdminOrderListMode } from '@/contexts/OrderContext';
 import { SalesOrder } from '@/types/erp';
 import { hideOrderAmountsForRole } from '@/lib/order-view-policy';
+import { formatMoney } from '@/lib/country';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: '#9CA3AF',
@@ -57,7 +58,7 @@ function OrderCard({ order, onPress, hideAmounts }: { order: SalesOrder; onPress
       ) : null}
       <View style={[styles.cardRow, hideAmounts && { justifyContent: 'flex-end' }]}>
         {!hideAmounts && (
-          <Text style={styles.amount}>KSh {Number(order.totalAmount).toLocaleString()}</Text>
+          <Text style={styles.amount}>{formatMoney(order.totalAmount, order.countryCode)}</Text>
         )}
         <Text style={styles.date}>{order.createdAt?.substring(0, 10)}</Text>
       </View>

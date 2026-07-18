@@ -10,6 +10,7 @@ import { useOrders } from '@/contexts/OrderContext';
 import { SalesOrder, OrderItem, Customer, ApprovalFlow } from '@/types/erp';
 import { apiRequest } from '@/contexts/AuthContext';
 import { hideOrderAmountsForRole } from '@/lib/order-view-policy';
+import { formatMoney } from '@/lib/country';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: '#9CA3AF', PENDING_APPROVAL: '#F59E0B', APPROVED: '#3B82F6',
@@ -147,7 +148,7 @@ export default function OrderDetailScreen() {
         {!hideOrderMoney && (
           <View style={styles.amountCard}>
             <Text style={styles.amountLabel}>Total Amount</Text>
-            <Text style={styles.amountValue}>KSh {Number(order.totalAmount).toLocaleString()}</Text>
+            <Text style={styles.amountValue}>{formatMoney(order.totalAmount, order.countryCode)}</Text>
           </View>
         )}
 
@@ -198,11 +199,11 @@ export default function OrderDetailScreen() {
                 <Text style={styles.itemSub}>
                   {hideOrderMoney
                     ? `Qty: ${it.qty}${it.unit ? ` ${it.unit}` : ''}`
-                    : `Qty: ${it.qty}${it.unit ? ` ${it.unit}` : ''} × KSh ${Number(it.unitPrice).toLocaleString()}`}
+                    : `Qty: ${it.qty}${it.unit ? ` ${it.unit}` : ''} × ${formatMoney(it.unitPrice, order.countryCode)}`}
                 </Text>
               </View>
               {!hideOrderMoney && (
-                <Text style={styles.itemTotal}>KSh {Number(it.total).toLocaleString()}</Text>
+                <Text style={styles.itemTotal}>{formatMoney(it.total, order.countryCode)}</Text>
               )}
             </View>
           ))}
