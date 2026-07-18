@@ -35,6 +35,8 @@ export interface Product {
   category?: string;
   unit: string;
   unitPrice: number;
+  /** ISO 3166-1 alpha-2 — pricing currency from CountryEnum */
+  countryCode?: string;
   imageUrl?: string;
   remark?: string;
   status?: number;

@@ -31,7 +31,7 @@ interface OrderContextType {
   customers: Customer[];
   products: Product[];
   searchCustomers: (keyword: string) => Promise<Customer[]>;
-  fetchProducts: (warehouseId?: number) => Promise<void>;
+  fetchProducts: (warehouseId?: number, countryCode?: string) => Promise<void>;
   patchOrderInList: (order: SalesOrder) => void;
 }
 
@@ -116,11 +116,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     return apiRequest<Customer[]>(`/customers/search?keyword=${encodeURIComponent(keyword)}`, {}, user.token);
   }, [user]);
 
-  const fetchProducts = useCallback(async (warehouseId?: number) => {
+  const fetchProducts = useCallback(async (warehouseId?: number, countryCode?: string) => {
     if (!user) return;
-    const path = warehouseId
-      ? `/inventory/products?warehouseId=${warehouseId}`
-      : '/inventory/products';
+    const params = new URLSearchParams();
+    if (warehouseId != null) params.set('warehouseId', String(warehouseId));
+    if (countryCode?.trim()) params.set('countryCode', countryCode.trim());
+    const qs = params.toString();
+    const path = qs ? `/inventory/products?${qs}` : '/inventory/products';
     const data = await apiRequest<Product[]>(path, {}, user.token);
     setProducts(data);
   }, [user]);

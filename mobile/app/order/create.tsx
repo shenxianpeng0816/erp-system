@@ -182,7 +182,7 @@ function ProductRow({
               >
                 <Text style={styles.resultName}>{p.name}</Text>
                 <Text style={styles.resultSub}>
-                  {p.productNo} · {formatMoney(p.unitPrice, countryCode)} / {p.unit} · stock {productStockQty(p)}
+                  {p.productNo} · {formatMoney(p.unitPrice, p.countryCode || countryCode)} / {p.unit} · stock {productStockQty(p)}
                 </Text>
               </TouchableOpacity>
             )}
@@ -353,9 +353,9 @@ export default function CreateOrderScreen() {
 
   useEffect(() => {
     if (warehouseId != null && warehouseId > 0) {
-      fetchProducts(warehouseId);
+      fetchProducts(warehouseId, countryCode || undefined);
     }
-  }, [warehouseId, fetchProducts]);
+  }, [warehouseId, countryCode, fetchProducts]);
 
   if (!isAuthorized) {
     return (
