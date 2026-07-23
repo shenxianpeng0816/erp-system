@@ -88,9 +88,8 @@ export interface ApprovalFlow {
 
 export type OrderStatus =
   | 'DRAFT'
-  | 'PENDING_APPROVAL'
-  | 'PENDING_FINANCE_APPROVAL'
-  | 'PENDING_ADMIN_APPROVAL'
+  | 'PENDING_FIRST_APPROVAL'
+  | 'PENDING_FINAL_APPROVAL'
   | 'APPROVED'
   | 'REJECTED'
   | 'SHIPPED'

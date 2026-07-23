@@ -15,9 +15,8 @@ import { hasPermi, MP, canOpenOrderDetail } from '@/lib/permission';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: '#9CA3AF',
-  PENDING_APPROVAL: '#F59E0B',
-  PENDING_FINANCE_APPROVAL: '#F59E0B',
-  PENDING_ADMIN_APPROVAL: '#F97316',
+  PENDING_FIRST_APPROVAL: '#F59E0B',
+  PENDING_FINAL_APPROVAL: '#F97316',
   APPROVED: '#3B82F6',
   REJECTED: '#EF4444', SHIPPED: '#8B5CF6', CONFIRMED: '#10B981', CANCELLED: '#6B7280',
 };
@@ -146,13 +145,13 @@ export default function OrderDetailScreen() {
   const currentUserId = Number(user?.userId);
   const isOrderOwner = Number.isFinite(currentUserId) && order.salesUserId === currentUserId;
   const canSubmit = order.status === 'DRAFT' && isOrderOwner && hasPermi(user, MP.orderSubmit);
-  const canApproveFinance =
-    order.status === 'PENDING_FINANCE_APPROVAL' &&
-    hasPermi(user, MP.orderApproveFinance);
-  const canApproveAdmin =
-    (order.status === 'PENDING_ADMIN_APPROVAL' || order.status === 'PENDING_APPROVAL') &&
-    (hasPermi(user, MP.orderApproveAdmin) || hasPermi(user, MP.orderApprove));
-  const canApprove = canApproveFinance || canApproveAdmin;
+  const canApproveFirst =
+    order.status === 'PENDING_FIRST_APPROVAL' &&
+    hasPermi(user, MP.orderApproveFirst);
+  const canApproveFinal =
+    order.status === 'PENDING_FINAL_APPROVAL' &&
+    (hasPermi(user, MP.orderApproveFinal) || hasPermi(user, MP.orderApprove));
+  const canApprove = canApproveFirst || canApproveFinal;
   const canConfirm = order.status === 'SHIPPED' && hasPermi(user, MP.orderConfirm);
 
   return (
@@ -292,7 +291,7 @@ export default function OrderDetailScreen() {
               <TouchableOpacity style={[styles.approveBtn, { backgroundColor: '#10B981' }]}
                 onPress={() => { setApprovalAction('APPROVE'); setShowApproval(true); }}>
                 <Text style={styles.approveBtnText}>
-                  {canApproveFinance ? '✓ First Approve' : '✓ Final Approve'}
+                  {canApproveFirst ? '✓ First Approve' : '✓ Final Approve'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.approveBtn, { backgroundColor: '#EF4444' }]}
@@ -314,7 +313,7 @@ export default function OrderDetailScreen() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>
               {approvalAction === 'APPROVE'
-                ? (canApproveFinance ? '✓ First Approve' : '✓ Final Approve')
+                ? (canApproveFirst ? '✓ First Approve' : '✓ Final Approve')
                 : '✕ Reject (return to draft)'}
             </Text>
             <Text style={styles.label}>
