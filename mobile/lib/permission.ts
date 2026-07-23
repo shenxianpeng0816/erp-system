@@ -25,3 +25,17 @@ export const MP = {
   orderPending: 'erp:order:pending',
   orderQuery: 'erp:order:query',
 } as const;
+
+/** Can open order detail screen (view or act on the order). */
+export function canOpenOrderDetail(user: AuthUser | null | undefined): boolean {
+  return hasAnyPermi(
+    user,
+    MP.orderQuery,
+    MP.orderEdit,
+    MP.orderSubmit,
+    MP.orderApprove,
+    MP.orderCancel,
+    MP.orderConfirm,
+    MP.orderPending,
+  );
+}

@@ -10,7 +10,7 @@ import { useOrders, AdminOrderListMode } from '@/contexts/OrderContext';
 import { SalesOrder } from '@/types/erp';
 import { hideOrderAmountsForRole } from '@/lib/order-view-policy';
 import { formatMoney } from '@/lib/country';
-import { hasAnyPermi, hasPermi, MP } from '@/lib/permission';
+import { hasAnyPermi, hasPermi, MP, canOpenOrderDetail } from '@/lib/permission';
 import { AuthUser } from '@/types/erp';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -274,7 +274,10 @@ export default function HomeScreen() {
           <OrderCard
             order={item}
             hideAmounts={hideAmounts}
-            onPress={() => router.push(`/order/${item.id}` as Href)}
+            onPress={() => {
+              if (!canOpenOrderDetail(user)) return;
+              router.push(`/order/${item.id}` as Href);
+            }}
           />
         )}
         ListHeaderComponent={listHeader}

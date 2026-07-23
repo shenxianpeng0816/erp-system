@@ -11,7 +11,7 @@ import { SalesOrder, OrderItem, Customer, ApprovalFlow } from '@/types/erp';
 import { apiRequest } from '@/contexts/AuthContext';
 import { hideOrderAmountsForRole } from '@/lib/order-view-policy';
 import { formatMoney } from '@/lib/country';
-import { hasPermi, MP } from '@/lib/permission';
+import { hasPermi, MP, canOpenOrderDetail } from '@/lib/permission';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: '#9CA3AF', PENDING_APPROVAL: '#F59E0B', APPROVED: '#3B82F6',
@@ -56,6 +56,11 @@ export default function OrderDetailScreen() {
 
   const load = useCallback(async () => {
     if (!user || !id) return;
+    if (!canOpenOrderDetail(user)) {
+      setOrder(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const o = await apiRequest<SalesOrder>(`/orders/${id}`, {}, user.token);
@@ -129,6 +134,13 @@ export default function OrderDetailScreen() {
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#1D4ED8" /></View>;
+  if (!canOpenOrderDetail(user)) {
+    return (
+      <View style={styles.center}>
+        <Text>You do not have permission to view this order.</Text>
+      </View>
+    );
+  }
   if (!order) return <View style={styles.center}><Text>Order not found</Text></View>;
 
   const hideOrderMoney = hideOrderAmountsForRole(user?.role);
