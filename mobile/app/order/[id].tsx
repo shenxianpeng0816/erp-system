@@ -14,7 +14,11 @@ import { formatMoney } from '@/lib/country';
 import { hasPermi, MP, canOpenOrderDetail } from '@/lib/permission';
 
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT: '#9CA3AF', PENDING_APPROVAL: '#F59E0B', APPROVED: '#3B82F6',
+  DRAFT: '#9CA3AF',
+  PENDING_APPROVAL: '#F59E0B',
+  PENDING_FINANCE_APPROVAL: '#F59E0B',
+  PENDING_ADMIN_APPROVAL: '#F97316',
+  APPROVED: '#3B82F6',
   REJECTED: '#EF4444', SHIPPED: '#8B5CF6', CONFIRMED: '#10B981', CANCELLED: '#6B7280',
 };
 
@@ -47,9 +51,8 @@ export default function OrderDetailScreen() {
   const [acting, setActing] = useState(false);
 
   const [showApproval, setShowApproval] = useState(false);
-  const [approvalAction, setApprovalAction] = useState<'APPROVE' | 'REJECT' | 'REDIRECT'>('APPROVE');
+  const [approvalAction, setApprovalAction] = useState<'APPROVE' | 'REJECT'>('APPROVE');
   const [comment, setComment] = useState('');
-  const [redirectTo, setRedirectTo] = useState('');
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [signUrl, setSignUrl] = useState('');
@@ -106,14 +109,10 @@ export default function OrderDetailScreen() {
     if (!order) return;
     setActing(true);
     try {
-      const updated = await approveOrder(
-        order.id, approvalAction, comment,
-        redirectTo ? parseInt(redirectTo) : undefined
-      );
+      const updated = await approveOrder(order.id, approvalAction, comment);
       setOrder(updated);
       setShowApproval(false);
       setComment('');
-      setRedirectTo('');
       await load();
     } finally {
       setActing(false);
@@ -147,7 +146,13 @@ export default function OrderDetailScreen() {
   const currentUserId = Number(user?.userId);
   const isOrderOwner = Number.isFinite(currentUserId) && order.salesUserId === currentUserId;
   const canSubmit = order.status === 'DRAFT' && isOrderOwner && hasPermi(user, MP.orderSubmit);
-  const canApprove = order.status === 'PENDING_APPROVAL' && hasPermi(user, MP.orderApprove);
+  const canApproveFinance =
+    order.status === 'PENDING_FINANCE_APPROVAL' &&
+    hasPermi(user, MP.orderApproveFinance);
+  const canApproveAdmin =
+    (order.status === 'PENDING_ADMIN_APPROVAL' || order.status === 'PENDING_APPROVAL') &&
+    (hasPermi(user, MP.orderApproveAdmin) || hasPermi(user, MP.orderApprove));
+  const canApprove = canApproveFinance || canApproveAdmin;
   const canConfirm = order.status === 'SHIPPED' && hasPermi(user, MP.orderConfirm);
 
   return (
@@ -235,12 +240,17 @@ export default function OrderDetailScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={styles.approvalHeader}>
                       <Text style={styles.approvalName}>
-                        {flow.approverName?.trim() || `Approver #${flow.approverId}`}
+                        {flow.status === 'PENDING'
+                          ? 'Awaiting reviewer'
+                          : (flow.approverName?.trim() || (flow.approverId ? `User #${flow.approverId}` : '—'))}
                       </Text>
                       <View style={[styles.approvalBadge, { backgroundColor: colors.bg }]}>
                         <Text style={[styles.approvalBadgeText, { color: colors.text }]}>{flow.status}</Text>
                       </View>
                     </View>
+                    {flow.approverRole ? (
+                      <Text style={styles.approvalMeta}>Role: {flow.approverRole}</Text>
+                    ) : null}
                     {flow.redirectTo != null && (
                       <Text style={styles.approvalMeta}>
                         → {flow.redirectToName?.trim() || `User #${flow.redirectTo}`}
@@ -281,15 +291,13 @@ export default function OrderDetailScreen() {
             <View style={styles.approvalBtns}>
               <TouchableOpacity style={[styles.approveBtn, { backgroundColor: '#10B981' }]}
                 onPress={() => { setApprovalAction('APPROVE'); setShowApproval(true); }}>
-                <Text style={styles.approveBtnText}>✓ Approve</Text>
+                <Text style={styles.approveBtnText}>
+                  {canApproveFinance ? '✓ First Approve' : '✓ Final Approve'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.approveBtn, { backgroundColor: '#EF4444' }]}
                 onPress={() => { setApprovalAction('REJECT'); setShowApproval(true); }}>
                 <Text style={styles.approveBtnText}>✕ Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.approveBtn, { backgroundColor: '#F59E0B' }]}
-                onPress={() => { setApprovalAction('REDIRECT'); setShowApproval(true); }}>
-                <Text style={styles.approveBtnText}>↗ Redirect</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -305,37 +313,30 @@ export default function OrderDetailScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>
-              {approvalAction === 'APPROVE' ? '✓ Approve Order'
-                : approvalAction === 'REJECT' ? '✕ Reject Order'
-                : '↗ Redirect Approval'}
+              {approvalAction === 'APPROVE'
+                ? (canApproveFinance ? '✓ First Approve' : '✓ Final Approve')
+                : '✕ Reject (return to draft)'}
             </Text>
-            <Text style={styles.label}>Comment</Text>
+            <Text style={styles.label}>
+              Comment{approvalAction === 'REJECT' ? ' (required)' : ''}
+            </Text>
             <TextInput
               style={[styles.input, { minHeight: 60 }]}
               multiline
               value={comment}
               onChangeText={setComment}
-              placeholder="Optional comment..."
+              placeholder={approvalAction === 'REJECT' ? 'Reason for returning to draft...' : 'Optional comment...'}
               placeholderTextColor="#9CA3AF"
             />
-            {approvalAction === 'REDIRECT' && (
-              <>
-                <Text style={styles.label}>Redirect to User ID</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="number-pad"
-                  value={redirectTo}
-                  onChangeText={setRedirectTo}
-                  placeholder="Enter user ID"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </>
-            )}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowApproval(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmActionBtn} onPress={handleApproval} disabled={acting}>
+              <TouchableOpacity
+                style={styles.confirmActionBtn}
+                onPress={handleApproval}
+                disabled={acting || (approvalAction === 'REJECT' && !comment.trim())}
+              >
                 {acting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.confirmActionText}>Confirm</Text>}
               </TouchableOpacity>
             </View>

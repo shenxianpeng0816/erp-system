@@ -74,8 +74,10 @@ export interface ApprovalFlow {
   id: number;
   orderId: number;
   step: number;
-  approverId: number;
+  approverId?: number;
   approverName?: string;
+  /** System role snapshot at action time */
+  approverRole?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REDIRECTED';
   redirectTo?: number;
   redirectToName?: string;
@@ -87,6 +89,8 @@ export interface ApprovalFlow {
 export type OrderStatus =
   | 'DRAFT'
   | 'PENDING_APPROVAL'
+  | 'PENDING_FINANCE_APPROVAL'
+  | 'PENDING_ADMIN_APPROVAL'
   | 'APPROVED'
   | 'REJECTED'
   | 'SHIPPED'

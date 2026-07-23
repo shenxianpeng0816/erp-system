@@ -26,7 +26,7 @@ interface OrderContextType {
     items: OrderItem[];
   }) => Promise<SalesOrder>;
   submitOrder: (orderId: number) => Promise<SalesOrder>;
-  approveOrder: (orderId: number, action: 'APPROVE' | 'REJECT' | 'REDIRECT', comment?: string, redirectTo?: number) => Promise<SalesOrder>;
+  approveOrder: (orderId: number, action: 'APPROVE' | 'REJECT', comment?: string) => Promise<SalesOrder>;
   confirmDelivery: (orderId: number, signImageUrl?: string) => Promise<SalesOrder>;
   customers: Customer[];
   products: Product[];
@@ -100,11 +100,11 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     return order;
   }, [user]);
 
-  const approveOrder = useCallback(async (orderId: number, action: string, comment?: string, redirectTo?: number) => {
+  const approveOrder = useCallback(async (orderId: number, action: string, comment?: string) => {
     if (!user) throw new Error('Not authenticated');
     const order = await apiRequest<SalesOrder>(`/orders/${orderId}/approval`, {
       method: 'POST',
-      body: JSON.stringify({ action, comment, redirectTo }),
+      body: JSON.stringify({ action, comment }),
     }, user.token);
     setOrders(prev => prev.map(o => o.id === orderId ? order : o));
     return order;
