@@ -10,6 +10,8 @@ import { useOrders, AdminOrderListMode } from '@/contexts/OrderContext';
 import { SalesOrder } from '@/types/erp';
 import { hideOrderAmountsForRole } from '@/lib/order-view-policy';
 import { formatMoney } from '@/lib/country';
+import { hasAnyPermi, hasPermi, MP } from '@/lib/permission';
+import { AuthUser } from '@/types/erp';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: '#9CA3AF',
@@ -83,11 +85,13 @@ export default function HomeScreen() {
   const skipNextFocusReload = useRef(false);
 
   const role = normalizeRole(user?.role);
-  const isAdmin = role === 'ADMIN';
-  const isSales = role === 'SALES';
-  const canShowOrders = isAdmin || isSales;
+  const canListMine = hasPermi(user, MP.orderListMine);
+  const canListAll = hasPermi(user, MP.orderListAll);
+  const canPending = hasPermi(user, MP.orderPending);
+  const canShowOrders = canListMine || canListAll || canPending;
+  const isAdminLike = canListAll || canPending;
 
-  const activeMode: AdminOrderListMode = isAdmin ? adminListMode : 'mine';
+  const activeMode: AdminOrderListMode = isAdminLike ? adminListMode : 'mine';
 
   const hasMore = orders.length < total;
 
@@ -154,11 +158,11 @@ export default function HomeScreen() {
   }, [activeMode, hasMore, listLoading, loadingMore, loadPage, page]);
 
   const listTitle = useMemo(() => {
-    if (!isAdmin) return 'My Orders';
+    if (!isAdminLike) return 'My Orders';
     if (adminListMode === 'pending') return 'Pending Approvals';
     if (adminListMode === 'all') return 'All Orders';
     return 'My Orders';
-  }, [isAdmin, adminListMode]);
+  }, [isAdminLike, adminListMode]);
 
   if (authLoading) {
     return (
@@ -170,8 +174,14 @@ export default function HomeScreen() {
 
   if (!user) return null;
 
-  const roleModules = getRoleModules(role);
+  const roleModules = getPermModules(user);
   const hideAmounts = hideOrderAmountsForRole(user.role);
+
+  const listModes = ADMIN_LIST_MODES.filter((mode) => {
+    if (mode.key === 'pending') return canPending;
+    if (mode.key === 'all') return canListAll;
+    return canListMine;
+  });
 
   const listHeader = (
     <>
@@ -200,9 +210,9 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {isAdmin && (
+      {isAdminLike && listModes.length > 0 && (
         <View style={styles.modeRow}>
-          {ADMIN_LIST_MODES.map(mode => (
+          {listModes.map(mode => (
             <TouchableOpacity
               key={mode.key}
               style={[styles.modeBtn, adminListMode === mode.key && styles.modeBtnActive]}
@@ -217,7 +227,7 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.sectionRow}>
-        <Text style={[styles.sectionTitle, { marginTop: isAdmin ? 12 : 24, paddingHorizontal: 0 }]}>
+        <Text style={[styles.sectionTitle, { marginTop: isAdminLike ? 12 : 24, paddingHorizontal: 0 }]}>
           {listTitle}
         </Text>
         {listLoading && !refreshing && <ActivityIndicator size="small" color="#1D4ED8" />}
@@ -249,7 +259,7 @@ export default function HomeScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {listHeader}
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>Order list is available for Sales and Admin roles.</Text>
+          <Text style={styles.emptyText}>No order list permission for this account.</Text>
         </View>
       </View>
     );
@@ -288,18 +298,18 @@ export default function HomeScreen() {
   );
 }
 
-function getRoleModules(role: string) {
-  const all = [
-    { label: 'New Order', icon: '📝', route: '/order/create', roles: ['SALES', 'ADMIN'] },
-    { label: 'My Orders', icon: '📋', route: '/(tabs)', roles: ['SALES'] },
-    { label: 'Approvals', icon: '✅', route: '/(tabs)', roles: ['ADMIN'] },
-    { label: 'Outbound', icon: '📦', route: '/(tabs)', roles: ['WAREHOUSE', 'INBOUND', 'ADMIN'] },
-    { label: 'Inbound', icon: '🚚', route: '/(tabs)', roles: ['INBOUND', 'WAREHOUSE', 'ADMIN'] },
-    { label: 'Invoices', icon: '🧾', route: '/(tabs)', roles: ['FINANCE', 'ADMIN'] },
-    { label: 'Receivables', icon: '💰', route: '/(tabs)', roles: ['FINANCE', 'ADMIN'] },
-    { label: 'Inventory', icon: '🏭', route: '/(tabs)', roles: ['WAREHOUSE', 'INBOUND', 'ADMIN'] },
+function getPermModules(user: AuthUser | null) {
+  const all: { label: string; icon: string; route: string; perms: string[] }[] = [
+    { label: 'New Order', icon: '📝', route: '/order/create', perms: [MP.orderAdd] },
+    { label: 'My Orders', icon: '📋', route: '/(tabs)', perms: [MP.orderListMine] },
+    { label: 'Approvals', icon: '✅', route: '/(tabs)', perms: [MP.orderPending] },
+    { label: 'Outbound', icon: '📦', route: '/(tabs)', perms: ['erp:outbound:list'] },
+    { label: 'Inbound', icon: '🚚', route: '/(tabs)', perms: ['erp:inbound:list'] },
+    { label: 'Invoices', icon: '🧾', route: '/(tabs)', perms: ['erp:finance:invoice:list'] },
+    { label: 'Receivables', icon: '💰', route: '/(tabs)', perms: ['erp:finance:receivable:list'] },
+    { label: 'Inventory', icon: '🏭', route: '/(tabs)', perms: ['erp:inventory:list'] },
   ];
-  return all.filter(m => m.roles.includes(role));
+  return all.filter((m) => hasAnyPermi(user, ...m.perms));
 }
 
 const styles = StyleSheet.create({

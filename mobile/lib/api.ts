@@ -24,7 +24,7 @@ async function parseResponseBody(res: Response): Promise<ApiEnvelope<unknown>> {
       return { code: 401, message: 'Unauthorized', data: null };
     }
     if (res.status === 403) {
-      return { code: 403, message: 'Access denied', data: null };
+      return { code: 403, message: '权限不足', data: null };
     }
     throw new Error(
       `Server returned empty response (HTTP ${res.status}). Check backend is running and EXPO_PUBLIC_API_BASE=${API_BASE}`,

@@ -14,6 +14,7 @@ import {
   defaultCountryFromCustomer,
   formatMoney,
 } from '@/lib/country';
+import { hasPermi, MP } from '@/lib/permission';
 
 // ── Customer Search Picker ─────────────────────────────────────────────────
 function CustomerPicker({
@@ -296,7 +297,7 @@ export default function CreateOrderScreen() {
   const [error, setError] = useState('');
   const [showError, setShowError] = useState(false);
 
-  const isAuthorized = Boolean(user && (user.role === 'SALES' || user.role === 'ADMIN'));
+  const isAuthorized = Boolean(user && hasPermi(user, MP.orderAdd));
   const totalAmount = items.reduce((s, i) => s + (i.total || 0), 0);
   const isBusy = saving || submitting;
   const hasDraft =
@@ -306,7 +307,7 @@ export default function CreateOrderScreen() {
     items.some((i) => i.productId > 0 || i.qty !== 1 || i.unitPrice > 0);
 
   useEffect(() => {
-    if (user && user.role !== 'SALES' && user.role !== 'ADMIN') {
+    if (user && !hasPermi(user, MP.orderAdd)) {
       router.replace('/(tabs)');
     }
   }, [user, router]);

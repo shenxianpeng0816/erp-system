@@ -51,13 +51,20 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (!user?.token) {
       throw new Error('Not authenticated');
     }
+    if (mode === 'pending') {
+      const list = await apiRequest<SalesOrder[]>('/orders/pending', {}, user.token);
+      const records = list ?? [];
+      return {
+        records,
+        total: records.length,
+        current: 1,
+        size: records.length || ORDER_PAGE_SIZE,
+      };
+    }
     const params = new URLSearchParams({
       page: String(page),
       size: String(ORDER_PAGE_SIZE),
     });
-    if (mode === 'pending') {
-      params.set('status', 'PENDING_APPROVAL');
-    }
     const path = mode === 'mine'
       ? `/orders/mine?${params}`
       : `/orders?${params}`;

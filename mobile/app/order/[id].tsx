@@ -11,6 +11,7 @@ import { SalesOrder, OrderItem, Customer, ApprovalFlow } from '@/types/erp';
 import { apiRequest } from '@/contexts/AuthContext';
 import { hideOrderAmountsForRole } from '@/lib/order-view-policy';
 import { formatMoney } from '@/lib/country';
+import { hasPermi, MP } from '@/lib/permission';
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: '#9CA3AF', PENDING_APPROVAL: '#F59E0B', APPROVED: '#3B82F6',
@@ -133,9 +134,9 @@ export default function OrderDetailScreen() {
   const hideOrderMoney = hideOrderAmountsForRole(user?.role);
   const currentUserId = Number(user?.userId);
   const isOrderOwner = Number.isFinite(currentUserId) && order.salesUserId === currentUserId;
-  const canSubmit = order.status === 'DRAFT' && isOrderOwner;
-  const canApprove = order.status === 'PENDING_APPROVAL' && user?.role?.toUpperCase() === 'ADMIN';
-  const canConfirm = order.status === 'SHIPPED' && (user?.role?.toUpperCase() === 'SALES' || user?.role?.toUpperCase() === 'ADMIN');
+  const canSubmit = order.status === 'DRAFT' && isOrderOwner && hasPermi(user, MP.orderSubmit);
+  const canApprove = order.status === 'PENDING_APPROVAL' && hasPermi(user, MP.orderApprove);
+  const canConfirm = order.status === 'SHIPPED' && hasPermi(user, MP.orderConfirm);
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>

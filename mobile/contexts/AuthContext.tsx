@@ -8,9 +8,27 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+async function fetchAndMergeInfo(token: string, base: AuthUser): Promise<AuthUser> {
+  try {
+    const info = await apiRequest<AuthUser>('/auth/getInfo', {}, token);
+    return {
+      ...base,
+      roles: info.roles,
+      permissions: info.permissions,
+      role: info.role ?? base.role,
+      realName: info.realName ?? base.realName,
+      username: info.username ?? base.username,
+      userId: info.userId ?? base.userId,
+    };
+  } catch {
+    return base;
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -21,6 +39,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshAuth = useCallback(async () => {
+    const cur = await storage.get<AuthUser>('ERP_USER');
+    if (!cur?.token) return;
+    const merged = await fetchAndMergeInfo(cur.token, cur);
+    await storage.set('ERP_USER', merged);
+    setUser(merged);
+  }, []);
+
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setUser(null);
@@ -29,9 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    storage.get<AuthUser>('ERP_USER').then((u) => {
+    storage.get<AuthUser>('ERP_USER').then(async (u) => {
       if (u?.token) {
-        setUser(u);
+        const merged = await fetchAndMergeInfo(u.token, u);
+        await storage.set('ERP_USER', merged);
+        setUser(merged);
       } else {
         setUser(null);
       }
@@ -47,11 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!data?.token) {
       throw new Error('Login response missing token');
     }
-    await storage.set('ERP_USER', data);
-    setUser(data);
+    const merged = await fetchAndMergeInfo(data.token, data);
+    await storage.set('ERP_USER', merged);
+    setUser(merged);
   }, []);
 
-  const value = useMemo(() => ({ user, isLoading, login, logout }), [user, isLoading, login, logout]);
+  const value = useMemo(
+    () => ({ user, isLoading, login, logout, refreshAuth }),
+    [user, isLoading, login, logout, refreshAuth],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

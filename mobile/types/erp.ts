@@ -8,6 +8,8 @@ export interface AuthUser {
   realName: string;
   role: UserRole;
   token: string;
+  roles?: string[];
+  permissions?: string[];
 }
 
 export interface Customer {
